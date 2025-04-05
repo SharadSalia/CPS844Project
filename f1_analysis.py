@@ -47,16 +47,20 @@ race_results = pd.merge(race_results, constructors, on='constructorId')
 # Create target variable: podium finish (1 if position <= 3, else 0)
 race_results['position'] = pd.to_numeric(race_results['position'], errors='coerce')
 race_results['podium'] = race_results['position'].apply(lambda x: 1 if not pd.isna(x) and x <= 3 else 0)
+race_results['fastestLapSpeed'] = pd.to_numeric(race_results['fastestLapSpeed'], errors='coerce')
 
 # Select and clean relevant features
-features = race_results[['grid', 'laps', 'milliseconds', 'fastestLapSpeed', 
-                        'driverId', 'constructorId', 'circuitId', 'year']].copy()
+features = race_results[['grid', 'laps', 'milliseconds', 'fastestLapSpeed',
+                         'driverId', 'constructorId', 'circuitId', 'year']].copy()
 
 # Convert numeric columns properly
 features['grid'] = pd.to_numeric(features['grid'], errors='coerce')
 features['laps'] = pd.to_numeric(features['laps'], errors='coerce')
 features['milliseconds'] = pd.to_numeric(features['milliseconds'], errors='coerce')
 features['fastestLapSpeed'] = pd.to_numeric(features['fastestLapSpeed'], errors='coerce')
+
+print("Initial Data Overview:")
+print(features.head())
 
 # Fill missing values
 numeric_cols = ['grid', 'laps', 'milliseconds', 'fastestLapSpeed']
@@ -71,17 +75,91 @@ features['circuitId'] = le.fit_transform(features['circuitId'])
 target = race_results['podium']
 
 # Task 2: Exploratory Data Analysis
-# Visual exploration
+# -----------------------------------------------------
+# 1. Podium vs Non-Podium Finishes (existing)
 plt.figure(figsize=(12, 6))
 sns.countplot(x='podium', data=race_results)
 plt.title('Podium vs Non-Podium Finishes')
 plt.show()
 
-# Correlation matrix (numeric columns only)
+# 2. Correlation matrix (numeric columns only) (existing)
 plt.figure(figsize=(12, 8))
-sns.heatmap(features[numeric_cols].corr(), annot=True, cmap='coolwarm')
+sns.heatmap(features[numeric_cols].corr(), annot=True)
 plt.title('Feature Correlation Matrix')
 plt.show()
+
+# 3. Distribution of finishing positions
+plt.figure()
+position_counts = race_results['position'].value_counts(dropna=True).sort_index()
+position_counts.plot(kind='bar')
+plt.xlabel('Finishing Position')
+plt.ylabel('Count')
+plt.title('Distribution of Finishing Positions')
+plt.show()
+
+# 4. Histogram of grid positions
+plt.figure()
+race_results['grid'].dropna().plot(kind='hist', bins=20)
+plt.title('Histogram of Grid Positions')
+plt.xlabel('Grid Position')
+plt.ylabel('Frequency')
+plt.show()
+
+# 5. Distribution of fastestLapSpeed (where valid)
+plt.figure()
+race_results['fastestLapSpeed'].dropna().plot(kind='hist', bins=30)
+plt.xlabel('Fastest Lap Speed')
+plt.ylabel('Frequency')
+plt.title('Distribution of Fastest Lap Speeds')
+plt.show()
+
+# 6. Scatter plot: grid vs. position
+#    (We need numeric data, so let's ensure no NaN)
+df_scatter = race_results[['grid', 'position']].dropna()
+plt.figure()
+plt.scatter(df_scatter['grid'], df_scatter['position'])
+plt.xlabel('Grid Position')
+plt.ylabel('Finishing Position')
+plt.title('Grid Position vs. Finishing Position')
+plt.show()
+
+# 7. Pairplot of numeric_cols from 'features'
+plt.figure()  
+sns.pairplot(features[numeric_cols])
+plt.show()
+
+# 8. Yearly race count
+if 'year' in race_results.columns:
+    plt.figure()
+    year_counts = race_results['year'].value_counts().sort_index()
+    year_counts.plot(kind='bar')
+    plt.title('Number of Races by Year')
+    plt.xlabel('Year')
+    plt.ylabel('Race Count')
+    plt.show()
+
+# 9. Average finishing position per constructor
+if 'constructorId' in race_results.columns:
+    plt.figure()
+    temp_df = race_results[['constructorId', 'position']].dropna()
+    avg_position_by_constructor = temp_df.groupby('constructorId')['position'].mean()
+    avg_position_by_constructor.plot(kind='bar')
+    plt.title('Average Finishing Position by ConstructorId')
+    plt.xlabel('ConstructorId')
+    plt.ylabel('Avg Finishing Position')
+    plt.show()
+
+# 10. Boxplot: laps vs. podium
+#     (Seeing if there's a distribution difference in laps for podium vs. non-podium)
+plt.figure()
+sns.boxplot(x='podium', y='laps', data=race_results.dropna(subset=['laps']))
+plt.title('Laps Distribution by Podium vs. Non-Podium')
+plt.xlabel('Podium (1 = Yes, 0 = No)')
+plt.ylabel('Laps')
+plt.show()
+
+# End of Expanded EDA
+# -----------------------------------------------------
 
 # Task 3: Preprocessing
 # Split data
@@ -94,13 +172,12 @@ X_test_scaled = scaler.transform(X_test)
 
 # Task 4: Model Comparison
 classifiers = {
-    "Logistic Regression": LogisticRegression(max_iter=1000),
+
     "K-Nearest Neighbors": KNeighborsClassifier(),
     "Decision Tree": DecisionTreeClassifier(),
     "Random Forest": RandomForestClassifier(),
     "Gradient Boosting": GradientBoostingClassifier(),
-    "Support Vector Machine": SVC(),
-    "Naive Bayes": GaussianNB()
+    "Support Vector Machine": SVC()
 }
 
 results = {}
@@ -179,7 +256,7 @@ kmeans = KMeans(n_clusters=3)
 driver_stats['cluster'] = kmeans.fit_predict(driver_stats[['podium', 'grid', 'fastestLapSpeed']].fillna(0))
 
 plt.figure(figsize=(10, 6))
-sns.scatterplot(data=driver_stats, x='grid', y='podium', hue='cluster', palette='viridis')
+sns.scatterplot(data=driver_stats, x='grid', y='podium', hue='cluster')
 plt.title('Driver Performance Clustering')
 plt.xlabel('Average Grid Position')
 plt.ylabel('Podium Percentage')
